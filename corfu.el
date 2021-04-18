@@ -281,6 +281,10 @@ If `line-spacing/=nil' or in text-mode, the background color is used instead.")
       (and (= (length x) (length y))
            (string< x y))))
 
+(defun corfu--sort (candidates)
+  "Sort CANDIDATES by `corfu--sort-predicate'."
+  (sort candidates #'corfu--sort-predicate))
+
 (defun corfu--file-predicate (pred)
   "Filter predicate for files given original predicate PRED."
   (let ((ignore (concat "\\(?:\\`\\|/\\)\\.?\\./\\'"
@@ -307,9 +311,9 @@ If `line-spacing/=nil' or in text-mode, the background color is used instead.")
                                          pt metadata))
          (all (car all-hl))
          (base (if-let (last (last all)) (prog1 (cdr last) (setcdr last nil)) 0)))
-    (setq all (if-let (sort (corfu--metadata-get metadata 'display-sort-function))
-                  (funcall sort all)
-                (sort all #'corfu--sort-predicate)))
+    (setq all (funcall (or (corfu--metadata-get metadata 'display-sort-function)
+                           #'corfu--sort)
+                       all))
     (setq all (corfu--move-prefix-candidates-to-front field all))
     (when (and completing-file (not (string-suffix-p "/" field)))
       (setq all (corfu--move-to-front (concat field "/") all)))
