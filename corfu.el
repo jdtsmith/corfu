@@ -76,8 +76,11 @@ filter string with spaces is allowed."
   :type 'boolean)
 
 (defcustom corfu-quit-no-match nil
-  "Automatically quit if no matching candidate is found."
-  :type 'boolean)
+  "Automatically quit if no matching candidate is found.  
+If a floating point number, quit on no match only if the
+auto-started completion began less than that number of seconds
+ago."
+  :type '(choice boolean float))
 
 (defcustom corfu-excluded-modes nil
   "List of modes excluded by `corfu-global-mode'."
@@ -168,6 +171,9 @@ filter string with spaces is allowed."
 
 (defvar corfu--auto-timer nil
   "Auto completion timer.")
+
+(defvar corfu--auto-start-time nil
+  "Timestamp when last auto-started completion began.")
 
 (defvar-local corfu--candidates nil
   "List of candidates.")
@@ -609,7 +615,11 @@ filter string with spaces is allowed."
            (test-completion str table pred))
       (corfu--done str 'finished)
       nil)
-     ((not (or corfu--candidates corfu-quit-no-match))           ;; 4) There are no candidates
+     ((not (or corfu--candidates
+	       (if (numberp corfu-quit-no-match)
+		   (< (float-time (time-since corfu--auto-start-time))
+		      corfu-quit-no-match)
+		 corfu-quit-no-match)))           ;; 4) There are no candidates
       (corfu--popup-show beg '(#("No match" 0 8 (face italic)))) ;; => Show confirmation popup
       t))))
 
@@ -830,6 +840,7 @@ filter string with spaces is allowed."
                                             ,table ,(plist-get plist :predicate)))
          (completion-in-region-mode 1)
          (corfu--setup)
+	 (setq corfu--auto-start-time (current-time))
          (unless (corfu--update #'ignore)
            (corfu-quit)))))))
 
@@ -837,7 +848,8 @@ filter string with spaces is allowed."
   "Post command hook which initiates auto completion."
   (when corfu--auto-timer
     (cancel-timer corfu--auto-timer)
-    (setq corfu--auto-timer nil))
+    (setq corfu--auto-timer nil
+	  corfu--auto-start-time nil))
   (when (and (not completion-in-region-mode)
              (display-graphic-p)
              (corfu--match-symbol-p corfu-auto-commands this-command))
